@@ -395,6 +395,7 @@ int32_t ad4110_spi_int_reg_write(struct ad4110_dev *dev,
 		data_size = 4;
 
 	buf[0] = (reg_map << 7) | AD4110_CMD_WR_COM_REG(reg_addr);
+	buf[0] |= (dev->addr << 4) & AD4110_DEV_ADDR_MASK;
 
 	switch(data_size) {
 	case 3:
@@ -453,6 +454,8 @@ int32_t ad4110_spi_int_reg_read(struct ad4110_dev *dev,
 	data_size = ad4110_get_data_size(dev, reg_map, reg_addr);
 
 	buf[0] = (reg_map << 7) | AD4110_CMD_READ_COM_REG(reg_addr); // cmd byte
+	buf[0] |= (dev->addr << 4) & AD4110_DEV_ADDR_MASK;
+
 	buf[1] = 0xAA; // dummy data byte
 	buf[2] = 0xAA; // dummy data byte
 	buf[3] = 0xAA; // dummy data byte
@@ -583,6 +586,7 @@ int32_t ad4110_setup(struct ad4110_dev **device,
 
 	ret |= ad4110_set_gain(dev, init_param.gain);
 	dev->gain = init_param.gain;
+	dev->addr = init_param.addr;
 
 	*device = dev;
 
