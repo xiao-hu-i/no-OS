@@ -207,6 +207,9 @@ struct ad4110_dev {
 	struct spi_desc			*spi_dev;
 	/* GPIO */
 	struct gpio_desc		*gpio_reset;
+	/* Optional. If is NULL it wont be used. Otherwise, it will monitor the 
+	rdy signal on read transactions */
+	struct gpio_desc		*gpio_nrdy;
 	/* Device Settings */
 	enum ad4110_state		data_stat;
 	enum ad4110_data_word_length 	data_length;
@@ -222,6 +225,7 @@ struct ad4110_init_param {
 	struct spi_init_param		spi_init;
 	/* GPIO */
 	struct gpio_init_param		gpio_reset;
+	struct gpio_init_param		*gpio_nrdy;
 	/* Device Settings */
 	enum ad4110_state		data_stat;
 	enum ad4110_data_word_length 	data_length;
