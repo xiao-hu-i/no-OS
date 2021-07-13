@@ -64,24 +64,24 @@
 	.store = iio_ad3552r_attr_set\
 }
 
-#define AD3552R_DAC_CH(idx)  {\
-	.name = "dac" # idx, \
+#define AD3552R_DAC_CH(_idx)  {\
+	.name = "dac" # _idx, \
 	.ch_type = IIO_VOLTAGE,\
-	.channel = idx,\
-	.scan_index = idx,\
+	.ch_out = 1,\
+	.indexed = true,\
+	.channel = _idx,\
+	.scan_index = _idx,\
 	.scan_type = &ad3552r_dac_scan_type,\
-	.attributes = iio_ad3552r_ch_attributes,\
-	.ch_out = 1 ,\
-	.indexed = true}
+	.attributes = iio_ad3552r_ch_attributes}
 
-#define AD3552R_DAC_PREC_CH(idx)  {\
-	.name = "dac" XSTR(idx) "_prec", \
+#define AD3552R_DAC_PREC_CH(_idx)  {\
+	.name = "dac" XSTR(_idx) "_prec", \
 	.ch_type = IIO_VOLTAGE,\
-	.channel = idx + 2,\
-	.scan_index = idx + 2,\
-	.scan_type = &ad3552r_dac_scan_type_prec,\
-	.ch_out = 1 ,\
-	.indexed = true}
+	.ch_out = 1,\
+	.indexed = true,\
+	.channel = _idx + 2,\
+	.scan_index = _idx + 2,\
+	.scan_type = &ad3552r_dac_scan_type_prec}
 
 #define AD3552R_CH_VOLTAGE		(AD3552R_CH_ENABLE + 1)
 

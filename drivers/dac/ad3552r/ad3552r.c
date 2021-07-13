@@ -274,7 +274,7 @@ static const float ch_ranges[][2] = {
 	[AD3552R_CH_OUTPUT_RANGE_NEG_10__10V]	= {-10, 10}
 };
 
-static const float defulatu_rfbs[] = {
+static const uint32_t default_rfbs[] = {
 	[AD3552R_CH_OUTPUT_RANGE_0__2_5V]	= 1,
 	[AD3552R_CH_OUTPUT_RANGE_0__5V]		= 1,
 	[AD3552R_CH_OUTPUT_RANGE_0__10V]	= 2,
@@ -313,7 +313,7 @@ static inline int32_t _ad3552r_write_reg_mask(struct ad3552r_desc *desc,
 		if (IS_ERR_VALUE(ret))
 			return ret;
 
-		reg = field_update(mask, reg, val);
+		reg = (reg & ~mask) | field_prep(mask, val);
 	}
 
 	return ad3552r_write_reg(desc, addr, reg);
@@ -402,7 +402,7 @@ static int32_t _update_spi_cfg(struct ad3552r_desc *desc,
 }
 
 /* Transfer data using CRC */
-int32_t _ad3552r_transfer_with_crc(struct ad3552r_desc *desc,
+static int32_t _ad3552r_transfer_with_crc(struct ad3552r_desc *desc,
 				   struct ad3552_transfer_data *data,
 				   uint8_t instr)
 {
@@ -681,6 +681,7 @@ static int32_t _update_timer_config(struct ad3552r_desc *desc)
 	uint32_t		new_load;
 	int32_t			ret;
 	float			scale;
+	float			desired_period;
 
 	if (!desc->tmr) {
 		tmr_param.id = desc->timer_id;
@@ -700,7 +701,7 @@ static int32_t _update_timer_config(struct ad3552r_desc *desc)
 		return ret;
 
 	new_load = desc->update_period_ns / 2.0;
-	float desired_period = (float)new_load / (SEC_TO_10NS(1) * 10);
+	desired_period = (float)new_load / (SEC_TO_10NS(1) * 10);
 	new_load = freq * desired_period;
 	ret = timer_counter_set(desc->tmr, new_load);
 	if (IS_ERR_VALUE(ret))
@@ -796,6 +797,8 @@ int32_t ad3552r_get_dev_value(struct ad3552r_desc *desc,
 		return 0;
 	case AD3552R_CRC_ENABLE:
 		ret =  _ad3552r_get_crc_enable(desc, &en);
+		if (IS_ERR_VALUE(ret))
+			return ret;
 		*val = en;
 		return ret;
 	case AD3552R_PRECISION_MODE_ENABLED:
@@ -971,7 +974,7 @@ static int32_t _ad3552r_set_gain_value(struct ad3552r_desc *desc,
 	default:
 		return -EINVAL;
 	}
-	regs = field_update(reg_mask, regs, val);
+	regs = (regs & ~reg_mask) | field_prep(reg_mask, val);
 
 	msg.is_read = 0;
 	return ad3552r_transfer(desc, &msg);
@@ -1117,8 +1120,11 @@ int32_t ad3552r_set_ch_value(struct ad3552r_desc *desc,
 	case AD3552R_CH_CODE:
 		return _ad3552r_set_code_value(desc, ch, val);
 	case AD3552R_CH_ENABLE:
-		desc->active_ch = field_update(AD3552R_MASK_CH(ch),
-					       desc->active_ch, val);
+		if (val)
+			desc->active_ch |= AD3552R_MASK_CH(ch);
+		else
+			desc->active_ch &= ~AD3552R_MASK_CH(ch);
+
 		return SUCCESS;
 	case AD3552R_CH_RFB:
 		desc->ch_data[ch].rfb = val;
@@ -1149,7 +1155,7 @@ int32_t ad3552r_set_ch_value(struct ad3552r_desc *desc,
 	if (attr == AD3552R_CH_OUTPUT_RANGE_SEL) {
 		val %= AD3552R_CH_OUTPUT_RANGE_NEG_10__10V + 1;
 		desc->ch_data[ch].range = val;
-		desc->ch_data[ch].rfb = defulatu_rfbs[val];
+		desc->ch_data[ch].rfb = default_rfbs[val];
 		
 	}
 

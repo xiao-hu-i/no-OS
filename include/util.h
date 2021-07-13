@@ -131,11 +131,6 @@ uint32_t find_closest(int32_t val,
 uint32_t field_prep(uint32_t mask, uint32_t val);
 /* Get a field specified by a mask from a word. */
 uint32_t field_get(uint32_t mask, uint32_t word);
-/*
- * Update the field specified by a mask from a word.
- * Ex. Word = 0001, Mask = 100, Val = 1 -> return 0101
- */
-uint32_t field_update(uint32_t mask, uint32_t word, uint32_t val);
 /* Log base 2 of the given number. */
 int32_t log_base_2(uint32_t x);
 /* Find greatest common divisor of the given two numbers. */
