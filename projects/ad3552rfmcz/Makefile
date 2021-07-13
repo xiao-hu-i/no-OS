@@ -6,6 +6,7 @@ TINYIIOD=y
 HARDWARE = ad3552r_qspi_zed_standard.hdf
 VERBOSE=0
 CFLAGS += -DDEBUG
+CFLAGS += -DLOG_LEVEL=LOG_DEBUG
 LIB_FLAGS += -lm
 
 include ../../tools/scripts/generic_variables.mk

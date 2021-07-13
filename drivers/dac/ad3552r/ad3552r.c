@@ -331,7 +331,7 @@ static inline int32_t _ad3552r_set_reg_attr(struct ad3552r_desc *desc,
 					     uint32_t val)
 {
 	return _ad3552r_write_reg_mask(desc, AD3552R_ATTR_REG(attr),
-			AD3552R_ATTR_MASK(attr), val);;
+			AD3552R_ATTR_MASK(attr), val);
 }
 
 /* Update spi interface configuration if needed */
@@ -925,9 +925,11 @@ int32_t ad3552r_get_ch_value(struct ad3552r_desc *desc,
  
 	addr = _get_ch_attr_reg_addr(desc, attr);
 	if (addr == AD3552R_REG_ADDR_SW_LDAC_24B ||
-	    addr == AD3552R_REG_ADDR_SW_LDAC_16B)
+	    addr == AD3552R_REG_ADDR_SW_LDAC_16B) {
+		pr_debug("Write only registers\n");
 	    	/* LDAC are write only registers */
 		return -EINVAL;
+	}
 
 	ret = ad3552r_read_reg(desc, addr, &reg);
 	if (IS_ERR_VALUE(ret))
@@ -943,9 +945,6 @@ int32_t ad3552r_set_ch_value(struct ad3552r_desc *desc,
 			     uint8_t ch,
 			     uint16_t val)
 {
-	uint32_t	mask;
-	uint32_t	new_bits;
-	uint8_t		addr;
 	int32_t		ret;
 
 	if (!desc)
@@ -978,10 +977,10 @@ int32_t ad3552r_set_ch_value(struct ad3552r_desc *desc,
 		return _ad3552r_set_gain_value(desc, attr, ch, val);
 
 	/* Update register related to attributes in chip */
-	mask = AD3552R_CH_ATTR_MASK(ch, attr);
-	new_bits = field_prep(AD3552R_CH_ATTR_MASK(ch, attr), val);
-	addr = _get_ch_attr_reg_addr(desc, attr);
-	ret = _ad3552r_write_reg_mask(desc, addr, mask, new_bits);
+	ret = _ad3552r_write_reg_mask(desc,
+				      _get_ch_attr_reg_addr(desc, attr),
+				      AD3552R_CH_ATTR_MASK(ch, attr),
+				      val);
 	if (IS_ERR_VALUE(ret))
 		return ret;
 
@@ -1243,6 +1242,35 @@ static int32_t _ad3552r_trigger_write_dev(struct ad3552r_desc *desc,
 					  uint8_t *data,
 					  uint32_t samples)
 {
+	uint8_t		nb_ch;
+	uint32_t	ch;
+	int32_t		ret;
+	uint32_t	bytes_per_sample;
+	uint32_t	val;
+	uint32_t	i;
+	uint32_t	bytes;
+
+	bytes_per_sample = desc->precision_en ? 3 : 2;
+	nb_ch = hweight8(desc->active_ch);
+	bytes = samples * nb_ch * bytes_per_sample;
+	ch = 0;
+	i = 0;
+	while (i < bytes) {
+		val = 0;
+		memcpy(&val, data + i, bytes_per_sample);
+		ret = ad3552r_set_ch_value(desc, AD3552R_CH_CODE, ch, val);
+		if (IS_ERR_VALUE(ret))
+			return ret;
+		ret = ad3552r_set_ch_value(desc,
+					   AD3552R_CH_TRIGGER_SOFTWARE_LDAC,
+					   ch, 1);
+		if (IS_ERR_VALUE(ret))
+			return ret;
+		i += bytes_per_sample;
+		ch = (ch + 1) % nb_ch;
+		if (ch == 0)
+			udelay(desc->ldac_period);
+	}
 
 	return SUCCESS;
 }
@@ -1259,6 +1287,8 @@ int32_t ad3552r_write_dev(struct ad3552r_desc *desc, uint8_t *data,
 
 	if (!desc || !desc->active_ch)
 		return -EINVAL;
+
+	//pr_debug("Writing %d samples:\n", samples);
 
 	if (desc->update_mode == AD3552R_UPDATE_INPUT ||
 	    desc->update_mode == AD3552R_UPDATE_INPUT_MASK)
@@ -1280,6 +1310,15 @@ int32_t ad3552r_write_dev(struct ad3552r_desc *desc, uint8_t *data,
 	msg.len = samples * nb_ch * bytes_per_sample;
 	msg.data = data;
 
+#if 1
+	uint16_t *aa = data;
+	for (int i = 0; i < samples * nb_ch; i++) {
+		//aa[i] = aa[i] & 0xFFF0;
+		aa[i] = bswap_constant_16(aa[i]);
+		//printf("%05d ", aa[i]);
+	}
+	printf("\n");
+#endif
 	return ad3552r_transfer(desc, &msg);
 }
 

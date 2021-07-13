@@ -36,6 +36,8 @@ from ad3552r import ad3552r
 import matplotlib.pyplot as plt
 import numpy as np
 
+NB_CH = 2
+
 def create_sin():
         N = 5000
         fc = 100
@@ -43,7 +45,24 @@ def create_sin():
         t = np.arange(0, N * ts, ts)
         d1 = (np.sin(2 * np.pi * t * fc) + 1) / 2 * 35000
         d2 = (np.cos(2 * np.pi * t * fc) + 1) / 2 * 35000
-        return (t, [d1, d2])
+        #print(len(d1))
+        if NB_CH == 1:
+                return (t, d1)
+        else:
+                return (t, [d1, d2])
+
+def ramp(t):
+        return t % 20000
+
+def create_ramp():
+        N = 10000
+        MAX = 30000
+        t = np.arange(0, N * 2)
+        d = np.arange(0, MAX, MAX / N)
+        d2 = np.arange(MAX, 0, -MAX / N)
+        d3 = np.append(d, d2)
+        #return (t, ramp(t))
+        return (t, d3)
 
 def print_sin(t, data):
         #plt.plot(t, np.transpose(outs)) 
@@ -54,15 +73,32 @@ def print_sin(t, data):
         plt.show()
 
 (t, _sin) = create_sin()
+#(t, _sin) = create_ramp()
 print_sin(t, _sin)
 
 # Set up AD7124
-dev = ad3552r(uri="serial:COM19")
-print('Conected to serial')
-dev.tx_enabled_channels = [0, 1]
-dev._tx_buffer_size = 1000
+#dev = ad3552r(uri="serial:COM19")
+dev = ad3552r(uri="ip:192.168.100.100")
+#dev.ldac_period_us = 100
+#dev.update_mode = 2
+dev.update_mode = 0
+print('Conected')
+
+if NB_CH == 1:
+        dev.tx_enabled_channels = [0]
+else:
+        dev.tx_enabled_channels = [0, 1]
 i = 0
+MAX_SIZE = 10000
 while True:
-        dev.tx(_sin)
-        print("Sent %d" % i)
+        j = 0
+        sz = len(_sin)
+        while j < sz:
+                tmp = min(sz - j, MAX_SIZE)
+                new_data = _sin[j : j + tmp]
+                #print(new_data)
+                dev.tx(new_data)
+                j = j + tmp
+        if i % 1000 == 0:
+                print("Sent %d" % i)
         i = i + 1
