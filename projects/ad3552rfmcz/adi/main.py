@@ -38,14 +38,14 @@ import numpy as np
 
 NB_CH = 1
 AMP = 60000
-SAMPLES = 100
-PERIODS = 10
+SAMPLES = 10000
+PERIODS = 100
 #MODE = 0 #DAC
 MODE = 2 #input
-LDAC_PERIOD_NS = 20000
+LDAC_PERIOD_NS = 100000
 #TRIGGER_MODE = 1 #dac delay trigger
 TRIGGER_MODE = 3 #internal ldac
-NB_TIMES = 1
+NB_TIMES = 10
 PRINT_SIN = 0
 
 def create_sin():

@@ -52,7 +52,7 @@
 /******************************************************************************/
 
 #if defined(_XPARAMETERS_PS_H_)
-#define CORE_PRIVATE_TIMER_CLOCK	XPAR_CPU_CORTEXA9_CORE_CLOCK_FREQ_HZ
+#define CORE_PRIVATE_TIMER_CLOCK	(XPAR_CPU_CORTEXA9_CORE_CLOCK_FREQ_HZ / 2)
 #endif
 
 /******************************************************************************/
@@ -326,9 +326,6 @@ int32_t timer_counter_set(struct timer_desc *desc, uint32_t new_val)
 	switch (xdesc->type) {
 	case TIMER_PS:
 #ifdef XSCUTIMER_H
-		if (new_val == 0)
-			return -EINVAL;
-
 		XScuTimer_LoadTimer((XScuTimer *)xdesc->instance, new_val - 1);
 		break;
 #endif
@@ -404,10 +401,10 @@ int32_t timer_count_clk_set(struct timer_desc *desc, uint32_t freq_hz)
 #ifdef XSCUTIMER_H
 		;
 		uint32_t prescaler = CORE_PRIVATE_TIMER_CLOCK / freq_hz;
-		if (prescaler == 0 || prescaler >= 255)
+		if (prescaler == 0 || prescaler >= 256)
 			return FAILURE;
 		XScuTimer_SetPrescaler(xdesc->instance, prescaler - 1);
-		desc->freq_hz = CORE_PRIVATE_TIMER_CLOCK / (prescaler + 1);
+		desc->freq_hz = CORE_PRIVATE_TIMER_CLOCK / prescaler;
 		break;
 #endif
 		return FAILURE;

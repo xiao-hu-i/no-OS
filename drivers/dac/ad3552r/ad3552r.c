@@ -685,6 +685,7 @@ static int32_t _update_timer_config(struct ad3552r_desc *desc)
 	if (!desc->tmr) {
 		tmr_param.id = desc->timer_id;
 		tmr_param.freq_hz = SEC_TO_10NS(1);
+		tmr_param.load_value = 0xFFFFFFFF;
 		tmr_param.extra = desc->tmr_extra;
 		ret = timer_init(&desc->tmr, &tmr_param);
 		if (IS_ERR_VALUE(ret))
@@ -698,8 +699,9 @@ static int32_t _update_timer_config(struct ad3552r_desc *desc)
 	if (IS_ERR_VALUE(ret))
 		return ret;
 
-	scale = (float)freq / (SEC_TO_10NS(1) * 10);
-	new_load = (desc->update_period_ns / 2.0) * scale;
+	new_load = desc->update_period_ns / 2.0;
+	float desired_period = (float)new_load / (SEC_TO_10NS(1) * 10);
+	new_load = freq * desired_period;
 	ret = timer_counter_set(desc->tmr, new_load);
 	if (IS_ERR_VALUE(ret))
 		return ret;
@@ -753,9 +755,6 @@ static int32_t _config_trigger_mode(struct ad3552r_desc *desc, uint16_t val)
 	case AD3552R_TRIGGER_HW_LDAC_INTERNAL:
 		if (!desc->ldac)
 			return -EINVAL;
-		ret = gpio_direction_output(desc->ldac, 0);
-		if (IS_ERR_VALUE(ret))
-			return ret;
 		desc->ldac_val = 0;
 		//No break;
 	case AD3552R_TRIGGER_DELAY_DAC_UPDATE:
@@ -1193,6 +1192,10 @@ int32_t ad3552r_init(struct ad3552r_desc **desc,
 	ldesc->hw_trigger_ctx = init_param->hw_trigger_ctx;
 
 	ret = gpio_get_optional(&ldesc->ldac, init_param->ldac_param);
+	if (IS_ERR_VALUE(ret))
+		goto err_spi;
+
+	ret = gpio_direction_output(ldesc->ldac, 0);
 	if (IS_ERR_VALUE(ret))
 		goto err_spi;
 
