@@ -49,16 +49,25 @@
 #include "iio_ad3552r.h"
 #include "ad3552r.h"
 #include "spi.h"
-#include "spi_extra.h"
 #include "gpio.h"
-#include "gpio_extra.h"
 #include "delay.h"
 #include "util.h"
-#include "gpio_extra.h"
+
+#ifdef XILINX_PLATFORM
 
 #include <xparameters.h>
 #include <xil_cache.h>
 #include <xil_cache.h>
+
+#include "spi_extra.h"
+#include "gpio_extra.h"
+#endif
+
+#ifdef LINUX_PLATFORM
+#include "linux_spi.h"
+#include "linux_gpio.h"
+#endif
+
 #include <stdint.h>
 
 #include <math.h>
@@ -75,13 +84,22 @@ static uint8_t gpio_default_prop[][2] = {
 		[GPIO_8] = {GPIO_OUT, GPIO_HIGH},
 };
 
+#ifdef XILIX_PLATFORM
+struct gpio_platform_ops	*gpio_ops = &xil_gpio_platform_ops;
+#define SPI_OPS 	(&xil_spi_reg_ops_pl)
+#endif
+#ifdef LINUX_PLATFORM
+struct gpio_platform_ops	*gpio_ops = &linux_gpio_platform_ops;
+#define SPI_OPS		(&linux_spi_platform_ops)
+#endif
+
 struct ad3552r_init_param default_ad3552r_param = {
 	.spi_param = {
-		.device_id = XPAR_SPI_0_DEVICE_ID,
+		.device_id = SPI_DEVICE_ID,
 		.chip_select = 0,
 		.mode = SPI_MODE_3,
 		.bit_order = SPI_BIT_ORDER_MSB_FIRST,
-		.platform_ops = &xil_spi_reg_ops_pl,
+		.platform_ops = SPI_OPS,
 		.extra = NULL
 	}
 };
@@ -125,15 +143,22 @@ int32_t init_gpios(struct gpio_desc **gpios)
 {
 	uint32_t i;
 	int32_t	 ret;
+	void *default_platform_param;
 
-	struct xil_gpio_init_param default_gpio_xil_param = {
+#ifdef XILINX_PLATFORM
+	struct xil_gpio_init_param platorm_gpio_xil_param = {
 			.device_id = GPIO_DEVICE_ID,
 			.type = GPIO_PS
 	};
+	default_platform_param = &platorm_gpio_xil_param;
+#endif
+#ifdef LINUX_PLATFORM
+	default_platform_param = NULL;
+#endif
 
 	struct gpio_init_param default_gpio_param = {
-			.platform_ops = &xil_gpio_platform_ops,
-			.extra = &default_gpio_xil_param
+			.platform_ops = gpio_ops,
+			.extra = default_platform_param
 	};
 
 	for (i = 0; i < TOTAL_GPIOS; i++) {
@@ -152,6 +177,25 @@ int32_t init_gpios(struct gpio_desc **gpios)
 	hardware_reset();
 	return ret;
 }
+#ifdef LINUX_PLATFORM
+#include <fcntl.h>
+#include <unistd.h>
+void remove_gpios() {
+	char path[100];
+	int fd;
+	int nb;
+	int ret;
+	int i;
+	int len;
+	for (i = 0; i < TOTAL_GPIOS; i++) {
+		nb = GPIO_OFFSET + i;
+		fd = open("/sys/class/gpio/unexport", O_WRONLY);
+		len = sprintf(path, "%d", nb);
+		write(fd, path, len);
+		close(fd);
+	}
+}
+#endif
 
 int32_t test_communication(struct ad3552r_desc *dac)
 {
@@ -363,7 +407,7 @@ void add_new_sample(buff_it_t *it, uint32_t sample, uint32_t store)
 }
 
 
-int32_t test_add_sample() {
+void test_add_sample() {
 	int ok = 1;
 	while (ok) {
 		uint32_t s1;
@@ -421,7 +465,7 @@ int32_t test_sine_single(struct ad3552r_desc *dac) {
 	int ok = 1;
 	set_timeout(TIMEOUT / 5);
 	uint16_t sin_lut[MAX_NB_SAMPLES * 2];
-	fill_with_sine(sin_lut, MAX_NB_SAMPLES, 2, 16, 16);
+	fill_with_sine((uint8_t *)sin_lut, MAX_NB_SAMPLES, 2, 16, 16);
 	while(!is_timeout() && ok) {
 		for (int i = 0; i < MAX_NB_SAMPLES; i++) {
 			uint16_t tmp = bswap_constant_16(sin_lut[i * 2]);
@@ -464,7 +508,7 @@ int32_t test_sine_stream(struct ad3552r_desc *dac) {
 			ad3552r_prepare_write(dac, 3);
 
 		pr_info("test_sine_stream. ch: %d\n", i);
-		fill_with_sine(sin_lut, MAX_NB_SAMPLES, i, 16, 16);
+		fill_with_sine((uint8_t *)sin_lut, MAX_NB_SAMPLES, i, 16, 16);
 
 		spi_cfg.stream_mode_length = sizeof(uint16_t) * i;
 		spi_cfg.stream_length_keep_value = 1;
@@ -791,16 +835,21 @@ int32_t test() {
 
 int main(void)
 {
+#ifdef LINUX_PLATFORM
+	remove_gpios();
+#endif
 	while (1)
 	{
 		int ok = 1;
 		uint32_t status;
 		test();
+		pr_debug("Test ended\n");
 		ad3552r_set_dev_value(dac, AD3552R_CRC_ENABLE, 0);
 		ad3552r_get_status(dac, &status, 1);
-		read_regs(dac);
+		//read_regs(dac);
 		while (ok)
 			;
 
 	}
+
 }

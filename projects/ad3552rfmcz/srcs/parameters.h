@@ -56,7 +56,25 @@
 /******************************************************************************/
 
 
+#define GPIO_BANK_0_PINS	32
+#define GPIO_BANK_1_PINS	22
+#define GPIO_BANK_2_PINS	32
+#define GPIO_BANK_3_OFFSET	(GPIO_BANK_0_PINS + GPIO_BANK_1_PINS + \
+				 GPIO_BANK_2_PINS)
+/* GPIO Indexes */
+#define GPIO_RESET_N				0
+#define GPIO_LDAC_N				1
+#define GPIO_SPI_QPI				2
+#define GPIO_ALERT_N				3
+#define GPIO_SYNC_EVENTS			4
+#define GPIO_6					5
+#define GPIO_7					6
+#define GPIO_8					7
+#define TOTAL_GPIOS				8
+
 #ifdef XILINX_PLATFORM
+
+#define SPI_DEVICE_ID XPAR_SPI_0_DEVICE_ID
 
 #ifdef _XPARAMETERS_PS_H_
 #define ADC_DDR_BASEADDR	(XPAR_DDR_MEM_BASEADDR + 0x800000)
@@ -90,22 +108,34 @@
 //#define UART_BAUDRATE		921600
 #define UART_BAUDRATE		115200
 
-#define SPI_DEVICE_ID 				XPAR_PS7_SPI_0_DEVICE_ID
 #define UART_DEVICE_ID				XPAR_XUARTPS_0_DEVICE_ID
 #define UART_IRQ_ID				XPAR_XUARTPS_1_INTR
 #define INTC_DEVICE_ID				XPAR_SCUGIC_SINGLE_DEVICE_ID
 #define GPIO_DEVICE_ID				XPAR_PS7_GPIO_0_DEVICE_ID
-#define GPIO_OFFSET				54 + 32
-#define GPIO_RESET_N				0
-#define GPIO_LDAC_N				1
-#define GPIO_SPI_QPI				2
-#define GPIO_ALERT_N				3
-#define GPIO_SYNC_EVENTS			4
-#define GPIO_6					5
-#define GPIO_7					6
-#define GPIO_8					7
-#define TOTAL_GPIOS				8
+#define GPIO_OFFSET				GPIO_BANK_3_OFFSET
 
 #endif // XILINX_PLATFORM
+
+#ifdef LINUX_PLATFORM
+#include <stdint.h>
+#define BUFF_SIZE 	2 * 10000
+const uint8_t dac_buff[BUFF_SIZE];
+#define DAC_DDR_BASEADDR	dac_buff
+#define UART_DEVICE_ID		0
+
+/* 400 * 8 * 2 = 6400‬ Default number of samples requested on a capture */
+#define MAX_SIZE_BASE_ADDR	10000
+//#define UART_BAUDRATE		921600
+#define UART_BAUDRATE		115200
+
+#define SPI_DEVICE_ID 				0
+#define UART_DEVICE_ID				0
+#define UART_IRQ_ID				0
+#define INTC_DEVICE_ID				0
+#define GPIO_DEVICE_ID				0
+#define GPIO_CHIP_BASE				906
+#define GPIO_OFFSET				(GPIO_BANK_3_OFFSET + GPIO_CHIP_BASE)
+
+#endif //LINUX_PLATFORM
 
 #endif // __PARAMETERS_H__
