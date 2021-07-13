@@ -12,6 +12,10 @@ class ad3552r(tx, context_manager, attribute):
     _complex_data = False
     _tx_channel_names = ["dac0", "dac1", "dac0_prec", "dac1_prec"]
     _device_name = ""
+    # Litell endian, unsinged, 2 bytes
+    _tx_data_type = '>u2'
+    # big endian, unsinged, 2 bytes
+    #_tx_data_type = '<u2'
 
     def __init__(self, uri="", device_index=0):
 

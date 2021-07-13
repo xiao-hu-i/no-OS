@@ -203,7 +203,9 @@ static struct iio_attribute iio_ad3552r_dev_attributes[] = {
 	AD3552R_ATTR("data_rate_mode", AD3552R_SPI_DATA_RATE),
 	AD3552R_ATTR("sync_dual_spi_en", AD3552R_SPI_SYNCHRONOUS_ENABLE),
 	AD3552R_ATTR("update_mode", AD3552R_UPDATE_MODE),
-	AD3552R_ATTR("ldac_period_us", AD3552R_LDAC_PERIOD_US),
+	AD3552R_ATTR("input_trigger_mode", AD3552R_INPUT_TRIGGER_MODE),
+	AD3552R_ATTR("dac_update_period_en", AD3552R_ENABLE_DAC_UPDATE_PERIOD),
+	AD3552R_ATTR("ldac_update_period_ns", AD3552R_DAC_UPDATE_PERIOD_NS),
 	AD3552R_ATTR("precision_mode_en", AD3552R_PRECISION_MODE_ENABLED),
 	END_ATTRIBUTES_ARRAY,
 };

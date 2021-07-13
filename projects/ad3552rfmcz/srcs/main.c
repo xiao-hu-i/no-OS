@@ -50,8 +50,11 @@
 #include "ad3552r.h"
 #include "spi.h"
 #include "gpio.h"
+#include "gpio_extra.h"
 #include "delay.h"
 #include "util.h"
+#include "irq_extra.h"
+#include "timer_extra.h"
 
 #ifdef XILINX_PLATFORM
 
@@ -84,7 +87,7 @@ static uint8_t gpio_default_prop[][2] = {
 		[GPIO_8] = {GPIO_OUT, GPIO_HIGH},
 };
 
-#ifdef XILIX_PLATFORM
+#ifdef XILINX_PLATFORM
 struct gpio_platform_ops	*gpio_ops = &xil_gpio_platform_ops;
 #define SPI_OPS 	(&xil_spi_reg_ops_pl)
 #endif
@@ -101,7 +104,9 @@ struct ad3552r_init_param default_ad3552r_param = {
 		.bit_order = SPI_BIT_ORDER_MSB_FIRST,
 		.platform_ops = SPI_OPS,
 		.extra = NULL
-	}
+	},
+	.timer_id = TIMER_DEVICE_ID,
+	.timer_intr_nb = TIMER_IRPT_INTR
 };
 
 struct gpio_desc *gpios[TOTAL_GPIOS];
@@ -162,6 +167,8 @@ int32_t init_gpios(struct gpio_desc **gpios)
 	};
 
 	for (i = 0; i < TOTAL_GPIOS; i++) {
+		if (i == GPIO_LDAC_N)
+			continue;
 		default_gpio_param.number = GPIO_OFFSET + i;
 		ret = gpio_get(&gpios[i], &default_gpio_param);
 		PRINT_AND_RET_ON_ERR(ret, "gpio_get failed");
@@ -736,12 +743,58 @@ int32_t test_crc_multiple_bytes(struct ad3552r_desc *dac)
 	return SUCCESS;
 }
 
+int32_t test_timer(struct ad3552r_desc *dac) {
+
+	return SUCCESS;
+}
+
 int32_t test() {
 	int32_t ret;
 
 	pr_debug("Start\n");
 
 	ret = init_gpios(gpios);
+
+	struct xil_gpio_init_param platorm_gpio_xil_param = {
+			.device_id = GPIO_DEVICE_ID,
+			.type = GPIO_PS
+	};
+	struct gpio_init_param	ldac_param = {
+			.number = GPIO_OFFSET + GPIO_LDAC_N,
+			.platform_ops = gpio_ops,
+			.extra = &platorm_gpio_xil_param
+	};
+
+	struct xil_timer_init_param xil_tmr_param = {
+			.type = TIMER_PS
+	};
+
+	struct xil_irq_init_param xil_irq_param = {
+			.type = IRQ_PS,
+	};
+	struct irq_init_param	irq_param = {
+			.irq_ctrl_id = INTC_DEVICE_ID,
+			.extra = &xil_irq_param
+	};
+	struct irq_ctrl_desc	*irq_crtl;
+
+	ret = irq_ctrl_init(&irq_crtl, &irq_param);
+	PRINT_AND_RET_ON_ERR(ret, "irq_ctrl_init failed");
+
+#if 0
+	int okk = 0;
+	struct gpio_desc *ldac;
+	gpio_get(&ldac, &ldac_param);
+	gpio_direction_output(ldac, 1);
+	while (1) {
+		mdelay(100);
+		gpio_set_value(ldac, okk);
+		okk = !okk;
+	}
+#endif
+	default_ad3552r_param.ldac_param = &ldac_param;
+	default_ad3552r_param.irq_crtl = irq_crtl;
+	default_ad3552r_param.tmr_extra = &xil_tmr_param;
 
 	ret = ad3552r_init(&dac, &default_ad3552r_param);
 	PRINT_AND_RET_ON_ERR(ret, "ad3552r_init failed");
@@ -801,6 +854,9 @@ int32_t test() {
 //
 //	ret = test_crc_stream_reg_different_values(dac);
 //	CHECK_TEST(ret, "test_crc_stream_reg_different_values");
+
+	ret = test_timer(dac);
+	CHECK_TEST(ret, "test_timer");
 
 	mdelay(1000);
 
