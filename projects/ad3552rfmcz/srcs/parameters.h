@@ -1,9 +1,9 @@
 /***************************************************************************//**
- *   @file   error.h
- *   @brief  Error codes definition
+ *   @file   ad9361/src/parameters.h
+ *   @brief  Parameters Definitions.
  *   @author DBogdan (dragos.bogdan@analog.com)
 ********************************************************************************
- * Copyright 2019(c) Analog Devices, Inc.
+ * Copyright 2013(c) Analog Devices, Inc.
  *
  * All rights reserved.
  *
@@ -36,38 +36,76 @@
  * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
  * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 *******************************************************************************/
+#ifndef __PARAMETERS_H__
+#define __PARAMETERS_H__
 
-#ifndef ERROR_H_
-#define ERROR_H_
+/******************************************************************************/
+/***************************** Include Files **********************************/
+/******************************************************************************/
 
-#include <errno.h>
-#include <stdio.h>
+#ifdef XILINX_PLATFORM
+#include <xparameters.h>
+#endif
+
+#ifdef ADUCM_PLATFORM
+#include "irq_extra.h"
+#endif
 
 /******************************************************************************/
 /********************** Macros and Constants Definitions **********************/
 /******************************************************************************/
 
-#ifdef SUCCESS
-#undef SUCCESS
+
+#ifdef XILINX_PLATFORM
+
+#ifdef _XPARAMETERS_PS_H_
+#define ADC_DDR_BASEADDR	(XPAR_DDR_MEM_BASEADDR + 0x800000)
+#define DAC_DDR_BASEADDR	(XPAR_DDR_MEM_BASEADDR + 0xA000000)
+#define UART_DEVICE_ID		XPAR_XUARTPS_0_DEVICE_ID
+#define INTC_DEVICE_ID		XPAR_SCUGIC_SINGLE_DEVICE_ID
+
+#ifdef XPS_BOARD_ZCU102
+#define UART_IRQ_ID		XPAR_XUARTPS_0_INTR
+#else
+#define UART_IRQ_ID		XPAR_XUARTPS_1_INTR
 #endif
-#define SUCCESS		0
-#ifdef FAILURE
-#undef FAILURE
+
+#else // _XPARAMETERS_PS_H_
+
+#ifdef XPAR_DDR3_SDRAM_S_AXI_BASEADDR
+#define ADC_DDR_BASEADDR	(XPAR_DDR3_SDRAM_S_AXI_BASEADDR + 0x800000)
+#define DAC_DDR_BASEADDR	(XPAR_DDR3_SDRAM_S_AXI_BASEADDR + 0xA000000)
+#else
+#define ADC_DDR_BASEADDR	(XPAR_AXI_DDR_CNTRL_BASEADDR + 0x800000)
+#define DAC_DDR_BASEADDR	(XPAR_AXI_DDR_CNTRL_BASEADDR + 0xA000000)
 #endif
-#define FAILURE		-1
 
-#ifndef __ELASTERROR
-#define __ELASTERROR 2000
-#endif
+#define UART_DEVICE_ID	XPAR_AXI_UART_DEVICE_ID
+#define INTC_DEVICE_ID	XPAR_INTC_SINGLE_DEVICE_ID
+#define UART_IRQ_ID		XPAR_AXI_INTC_AXI_UART_INTERRUPT_INTR
+#endif // _XPARAMETERS_PS_H_
 
-#define EOVERRUN	(__ELASTERROR + 1) /* Circular buffer overrun */
+/* 400 * 8 * 2 = 6400‬ Default number of samples requested on a capture */
+#define MAX_SIZE_BASE_ADDR	10000
+//#define UART_BAUDRATE		921600
+#define UART_BAUDRATE		115200
 
-#include <stdio.h>
-#define IS_ERR_VALUE(ret) ((ret) < 0 ?\
-		(0 < printf("Errors: %d(-0x%x). Func: %s. Line: %d\n", (int)ret, (int)-ret,\
-				__func__, __LINE__)):\
-		(0))
+#define SPI_DEVICE_ID 				XPAR_PS7_SPI_0_DEVICE_ID
+#define UART_DEVICE_ID				XPAR_XUARTPS_0_DEVICE_ID
+#define UART_IRQ_ID				XPAR_XUARTPS_1_INTR
+#define INTC_DEVICE_ID				XPAR_SCUGIC_SINGLE_DEVICE_ID
+#define GPIO_DEVICE_ID				XPAR_PS7_GPIO_0_DEVICE_ID
+#define GPIO_OFFSET				54 + 32
+#define GPIO_RESET_N				0
+#define GPIO_LDAC_N				1
+#define GPIO_SPI_QPI				2
+#define GPIO_ALERT_N				3
+#define GPIO_SYNC_EVENTS			4
+#define GPIO_6					5
+#define GPIO_7					6
+#define GPIO_8					7
+#define TOTAL_GPIOS				8
 
-//#define IS_ERR_VALUE(x)	((x) < 0)
+#endif // XILINX_PLATFORM
 
-#endif // ERROR_H_
+#endif // __PARAMETERS_H__
