@@ -720,7 +720,6 @@ int32_t test_crc_multiple_bytes(struct ad3552r_desc *dac)
 	PRINT_AND_RET_ON_ERR(ret, "ad3552r_set_dev_value failed");
 
 	/* This is not working */
-	/* TODO Ask Miguel why this is not working */
 	ret = ad3552r_read_reg(dac, AD3552R_REG_ADDR_CH_DAC_16B(0), &val);
 	PRINT_AND_RET_ON_ERR(ret, "AD3552R_REG_ADDR_CH_DAC_16B failed");
 	ret = ad3552r_write_reg(dac, AD3552R_REG_ADDR_CH_DAC_16B(0), PRODUCT_ID);

@@ -38,10 +38,19 @@ import numpy as np
 
 NB_CH = 1
 AMP = 60000
+SAMPLES = 100
+PERIODS = 10
+#MODE = 0 #DAC
+MODE = 2 #input
+LDAC_PERIOD_NS = 20000
+#TRIGGER_MODE = 1 #dac delay trigger
+TRIGGER_MODE = 3 #internal ldac
+NB_TIMES = 1
+PRINT_SIN = 0
 
 def create_sin():
-        N = 5000
-        fc = 10
+        N = SAMPLES
+        fc = PERIODS
         ts = 1 / float(N)
         t = np.arange(0, N * ts, ts)
         d1 = (np.sin(2 * np.pi * t * fc) + 1) / 2 * AMP
@@ -56,7 +65,7 @@ def ramp(t):
         return t % 20000
 
 def create_ramp():
-        N = 1000
+        N = SAMPLES
         MAX = AMP
         t = np.arange(0, N * 2)
         d = np.arange(0, MAX, MAX / N)
@@ -79,24 +88,38 @@ def print_sin(t, data):
 
 (t, _sin) = create_sin()
 #(t, _sin) = create_ramp()
-print_sin(t, _sin)
+if PRINT_SIN == 1:
+        print_sin(t, _sin)
 
 # Set up AD7124
 dev = ad3552r(uri="serial:COM19")
 #dev = ad3552r(uri="ip:192.168.100.100")
-#dev.ldac_period_us = 100
-#dev.update_mode = 2
-dev.update_mode = 0
 print('Conected')
 
 if NB_CH == 1:
-        #dev.tx_enabled_channels = [0]
-        dev.tx_enabled_channels = [1]
+        dev.tx_enabled_channels = [0]
+        #dev.tx_enabled_channels = [1]
 else:
         dev.tx_enabled_channels = [0, 1]
-i = 0
+
+dev.update_mode = MODE
+if dev.update_mode != MODE:
+        print("Fail1")
+dev.ldac_update_period_ns = LDAC_PERIOD_NS
+if dev.ldac_update_period_ns != LDAC_PERIOD_NS:
+        print("Fail2")
+dev.input_trigger_mode = TRIGGER_MODE
+if dev.input_trigger_mode != TRIGGER_MODE:
+        print("Fail3")
+
 MAX_SIZE = 10000
-while True:
+if NB_TIMES == 0:
+        inc = 0
+else:
+        inc = 1
+
+i = 0
+while i <= NB_TIMES:
         j = 0
         sz = len(_sin)
         while j < sz:
@@ -107,4 +130,4 @@ while True:
                 j = j + tmp
         if i % 1000 == 0:
                 print("Sent %d" % i)
-        i = i + 1
+        i = i + inc

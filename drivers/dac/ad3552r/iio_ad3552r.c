@@ -92,7 +92,8 @@
 static ssize_t iio_ad3552r_attr_get(void *device, char *buf, size_t len,
 		const struct iio_ch_info *channel, intptr_t priv)
 {
-	uint16_t	val;
+	uint32_t	val;
+	uint16_t	val16;
 	int32_t		ret;
 	float		val2;
 
@@ -105,24 +106,26 @@ static ssize_t iio_ad3552r_attr_get(void *device, char *buf, size_t len,
 
 		return snprintf(buf, len, "%.3f", val2);
 	default:
-		if (channel)
+		if (channel) {
 			ret = ad3552r_get_ch_value(device, priv,
 						   channel->ch_num,
-						   &val);
-		else
+						   &val16);
+			val = val16;
+		} else {
 			ret = ad3552r_get_dev_value(device, priv, &val);
+		}
 		break;
 	}
 
 	if (IS_ERR_VALUE(ret))
 		return ret;
 
-	return snprintf(buf, len, "%"PRIu16"", val);
+	return snprintf(buf, len, "%"PRIu32"", val);
 }
 static ssize_t iio_ad3552r_attr_set(void *device, char *buf, size_t len,
 			 const struct iio_ch_info *channel, intptr_t priv)
 {
-	uint16_t val;
+	uint32_t val;
 	int32_t	 ret;
 	float	 val2;
 
@@ -204,7 +207,6 @@ static struct iio_attribute iio_ad3552r_dev_attributes[] = {
 	AD3552R_ATTR("sync_dual_spi_en", AD3552R_SPI_SYNCHRONOUS_ENABLE),
 	AD3552R_ATTR("update_mode", AD3552R_UPDATE_MODE),
 	AD3552R_ATTR("input_trigger_mode", AD3552R_INPUT_TRIGGER_MODE),
-	AD3552R_ATTR("dac_update_period_en", AD3552R_ENABLE_DAC_UPDATE_PERIOD),
 	AD3552R_ATTR("ldac_update_period_ns", AD3552R_DAC_UPDATE_PERIOD_NS),
 	AD3552R_ATTR("precision_mode_en", AD3552R_PRECISION_MODE_ENABLED),
 	END_ATTRIBUTES_ARRAY,

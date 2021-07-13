@@ -88,20 +88,19 @@ struct ad3552r_desc {
 	uint16_t			timer_id;
 	uint16_t			timer_intr_nb;
 	void				*tmr_extra;
-	volatile uint8_t		is_timeout;
+	volatile uint8_t		is_rise_edge;
 	uint8_t				(*is_hw_trigger_ready)(void *ctx);
 	void				*hw_trigger_ctx;
 	uint32_t	active_ch;
-	uint32_t	update_period_us;
+	uint32_t	update_period_ns;
 	uint8_t		crc_table[CRC8_TABLE_SIZE];
-	uint8_t		dac_period_en : 1;
 	uint8_t		ldac_val : 1;
 	uint8_t		precision_en : 1;
 	uint8_t		crc_en : 1;
 	uint8_t		vref_sel : 2;
 };
 
-#define SEC_TO_NS(x)		(x * 1000000000)
+#define SEC_TO_10NS(x)		((x) * 100000000)
 
 #define AD3552R_ATTR_REG(attr) addr_mask_map[attr][0]
 #define AD3552R_ATTR_MASK(attr) addr_mask_map[attr][1]
@@ -636,52 +635,6 @@ static int32_t _ad3552r_set_crc_enable(struct ad3552r_desc *desc, uint16_t en)
 	return SUCCESS;
 }
 
-int32_t ad3552r_get_dev_value(struct ad3552r_desc *desc,
-			  enum ad3552r_dev_attributes attr,
-			  uint16_t *val)
-{
-	uint32_t tmp;
-	int32_t  ret;
-
-	if (!desc || !val)
-		return -EINVAL;
-
-	switch (attr) {
-	case AD3552R_SPI_MULTI_IO_MODE:
-	case AD3552R_SPI_DATA_RATE:
-	case AD3552R_SPI_SYNCHRONOUS_ENABLE:
-		/* TODO. Only standard spi implemented for the moment */
-		return -EINVAL;
-	case AD3552R_CRC_ENABLE:
-		return _ad3552r_get_crc_enable(desc, val);
-	case AD3552R_PRECISION_MODE_ENABLED:
-		*val = desc->precision_en;
-		break;
-	case AD3552R_UPDATE_MODE:
-		*val = desc->update_mode;
-		break;
-	case AD3552R_INPUT_TRIGGER_MODE:
-		*val = desc->trigger_mode;
-		break;
-	case AD3552R_DAC_UPDATE_PERIOD_NS:
-		*val = desc->update_period_us;
-		break;
-	case AD3552R_ENABLE_DAC_UPDATE_PERIOD:
-		*val = desc->dac_period_en;
-		break;
-	case AD3552R_VREF_SELECT:
-		*val = desc->vref_sel;
-		break;
-	default:
-		ret = _ad3552r_get_reg_attr(desc, attr, &tmp);
-		*val = tmp;
-
-		return ret;
-	}
-
-	return SUCCESS;
-}
-
 static void _tmr_callback(struct ad3552r_desc *desc, uint32_t event,
 			  void *extra)
 {
@@ -692,9 +645,10 @@ static void _tmr_callback(struct ad3552r_desc *desc, uint32_t event,
 		ret = gpio_set_value(desc->ldac, !desc->ldac_val);
 		if (IS_ERR_VALUE(ret))
 			return ;
+		if (desc->ldac_val == 0)
+			desc->is_rise_edge = 1;
 		desc->ldac_val = !desc->ldac_val;
 	}
-	desc->is_timeout = (desc->is_timeout + 1) % 3;
 }
 
 static int32_t _remove_timer_config(struct ad3552r_desc *desc)
@@ -726,10 +680,11 @@ static int32_t _update_timer_config(struct ad3552r_desc *desc)
 	uint32_t		freq;
 	uint32_t		new_load;
 	int32_t			ret;
+	float			scale;
 
 	if (!desc->tmr) {
 		tmr_param.id = desc->timer_id;
-		tmr_param.freq_hz = SEC_TO_NS(1);
+		tmr_param.freq_hz = SEC_TO_10NS(1);
 		tmr_param.extra = desc->tmr_extra;
 		ret = timer_init(&desc->tmr, &tmr_param);
 		if (IS_ERR_VALUE(ret))
@@ -743,7 +698,8 @@ static int32_t _update_timer_config(struct ad3552r_desc *desc)
 	if (IS_ERR_VALUE(ret))
 		return ret;
 
-	new_load =  desc->update_period_us * (freq / SEC_TO_NS(1)) / 2;
+	scale = (float)freq / (SEC_TO_10NS(1) * 10);
+	new_load = (desc->update_period_ns / 2.0) * scale;
 	ret = timer_counter_set(desc->tmr, new_load);
 	if (IS_ERR_VALUE(ret))
 		return ret;
@@ -802,6 +758,7 @@ static int32_t _config_trigger_mode(struct ad3552r_desc *desc, uint16_t val)
 			return ret;
 		desc->ldac_val = 0;
 		//No break;
+	case AD3552R_TRIGGER_DELAY_DAC_UPDATE:
 	case AD3552R_TRIGGER_SW_LDAC:
 		ret = _update_timer_config(desc);
 		if (IS_ERR_VALUE(ret))
@@ -819,9 +776,57 @@ static int32_t _config_trigger_mode(struct ad3552r_desc *desc, uint16_t val)
 	return SUCCESS;
 }
 
+int32_t ad3552r_get_dev_value(struct ad3552r_desc *desc,
+			  enum ad3552r_dev_attributes attr,
+			  uint32_t *val)
+{
+	uint32_t tmp;
+	int32_t  ret;
+	uint16_t en;
+
+	if (!desc || !val)
+		return -EINVAL;
+
+	switch (attr) {
+	case AD3552R_SPI_MULTI_IO_MODE:
+	case AD3552R_SPI_DATA_RATE:
+	case AD3552R_SPI_SYNCHRONOUS_ENABLE:
+		/* TODO. Only standard spi implemented for the moment */
+		//return -EINVAL;
+		*val = 0;
+		return 0;
+	case AD3552R_CRC_ENABLE:
+		ret =  _ad3552r_get_crc_enable(desc, &en);
+		*val = en;
+		return ret;
+	case AD3552R_PRECISION_MODE_ENABLED:
+		*val = desc->precision_en;
+		break;
+	case AD3552R_UPDATE_MODE:
+		*val = desc->update_mode;
+		break;
+	case AD3552R_INPUT_TRIGGER_MODE:
+		*val = desc->trigger_mode;
+		break;
+	case AD3552R_DAC_UPDATE_PERIOD_NS:
+		*val = desc->update_period_ns;
+		break;
+	case AD3552R_VREF_SELECT:
+		*val = desc->vref_sel;
+		break;
+	default:
+		ret = _ad3552r_get_reg_attr(desc, attr, &tmp);
+		*val = tmp;
+
+		return ret;
+	}
+
+	return SUCCESS;
+}
+
 int32_t ad3552r_set_dev_value(struct ad3552r_desc *desc,
 			  enum ad3552r_dev_attributes attr,
-			  uint16_t val)
+			  uint32_t val)
 {
 	if (!desc)
 		return -EINVAL;
@@ -831,7 +836,8 @@ int32_t ad3552r_set_dev_value(struct ad3552r_desc *desc,
 	case AD3552R_SPI_DATA_RATE:
 	case AD3552R_SPI_SYNCHRONOUS_ENABLE:
 		/* TODO. Only standard spi implemented for the moment */
-		return -EINVAL;
+		//return -EINVAL;
+		return 0;
 	case AD3552R_CRC_ENABLE:
 		return _ad3552r_set_crc_enable(desc, val);
 	case AD3552R_PRECISION_MODE_ENABLED:
@@ -843,12 +849,11 @@ int32_t ad3552r_set_dev_value(struct ad3552r_desc *desc,
 	case AD3552R_INPUT_TRIGGER_MODE:
 		return _config_trigger_mode(desc, val);
 	case AD3552R_DAC_UPDATE_PERIOD_NS:
-		desc->update_period_us = val;
+		if (val < 10)
+			return -EINVAL;
+		desc->update_period_ns = val;
 		if (desc->tmr)
 			return _update_timer_config(desc);
-		break;
-	case AD3552R_ENABLE_DAC_UPDATE_PERIOD:
-		desc->dac_period_en = !!val;
 		break;
 	case AD3552R_VREF_SELECT:
 		desc->vref_sel = val & AD3552R_MASK_REFERENCE_VOLTAGE_SEL;
@@ -1176,7 +1181,7 @@ int32_t ad3552r_init(struct ad3552r_desc **desc,
 	if (IS_ERR_VALUE(ret))
 		goto err_spi;
 
-	ldesc->update_period_us = AD3552R_DEFAULT_DAC_UPDATE_PERIOD;
+	ldesc->update_period_ns = AD3552R_DEFAULT_DAC_UPDATE_PERIOD;
 	ldesc->ch_data[0].code_max = UINT16_MAX;
 	ldesc->ch_data[1].code_max = UINT16_MAX;
 	ldesc->active_ch = 0;
@@ -1440,10 +1445,10 @@ static void _wait_for_trigger(struct ad3552r_desc *desc)
 {
 	switch (desc->trigger_mode) {
 	case AD3552R_TRIGGER_SW_LDAC:
-		//No break;
+	case AD3552R_TRIGGER_DELAY_DAC_UPDATE:
 	case AD3552R_TRIGGER_HW_LDAC_INTERNAL:
-		desc->is_timeout = 0;
-		while (desc->is_timeout != 2)
+		desc->is_rise_edge = 0;
+		while (desc->is_rise_edge != 1)
 			;
 		break;
 	case AD3552R_TRIGGER_HW_LDAC_EXTERNAL:
@@ -1473,20 +1478,21 @@ int32_t ad3552r_write_dev(struct ad3552r_desc *desc, uint8_t *data,
 
 	if ((desc->update_mode == AD3552R_UPDATE_DAC ||
 	     desc->update_mode == AD3552R_UPDATE_DAC_MASK) && 
-	    !desc->dac_period_en)
+	    desc->trigger_mode != AD3552R_TRIGGER_DELAY_DAC_UPDATE)
 		return _ad3552r_write_dev_direct(desc, data, samples);
 
 	bytes_per_sample = desc->precision_en ? 3 : 2;
 	len = hweight8(desc->active_ch) * bytes_per_sample;
-	ch = find_last_set_bit(desc->active_ch) - 1;
+	ch = find_last_set_bit(desc->active_ch);
+	addr = _get_code_reg_addr(ch, desc->update_mode,
+				  desc->precision_en);
+	addr +=  _ad3552r_reg_len(addr) - 1;
+	msg.addr = addr;
+	msg.data = val;
+	msg.spi_cfg = &spi_cfg;
+	msg.len = len;
 	for (i = 0; i < samples; i++) {
-		memcpy(val, data + i, len);
-		addr = _get_code_reg_addr(ch, desc->update_mode,
-					  desc->precision_en);
-		msg.spi_cfg = &spi_cfg;
-		msg.addr = addr;
-		msg.data = val;
-		msg.len = len;
+		memcpy(val, data + i * len, len);
 		ret = ad3552r_transfer(desc, &msg);
 		if (IS_ERR_VALUE(ret))
 			return ret;
