@@ -10,8 +10,9 @@ class ad3552r(tx, context_manager, attribute):
     """ AD3552r ADC """
 
     _complex_data = False
-    _tx_channel_names = ["dac0", "dac1", "dac0_prec", "dac1_prec"]
-    _device_name = ""
+    _tx_channel_names = ["voltage0", "voltage1", "voltage2_x&z",
+                        "voltage3", "voltage4", "voltage5_x&z"]
+    _device_name = "ad3552r"
     # Litell endian, unsinged, 2 bytes
     _tx_data_type = '>u2'
     # big endian, unsinged, 2 bytes

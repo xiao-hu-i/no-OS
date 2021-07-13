@@ -44,7 +44,7 @@ PERIODS = 100
 MODE = 2 #input
 LDAC_PERIOD_NS = 100000
 #TRIGGER_MODE = 1 #dac delay trigger
-TRIGGER_MODE = 3 #internal ldac
+TRIGGER_MODE = "software" #internal ldac
 NB_TIMES = 10
 PRINT_SIN = 0
 
@@ -102,16 +102,6 @@ if NB_CH == 1:
 else:
         dev.tx_enabled_channels = [0, 1]
 
-dev.update_mode = MODE
-if dev.update_mode != MODE:
-        print("Fail1")
-dev.ldac_update_period_ns = LDAC_PERIOD_NS
-if dev.ldac_update_period_ns != LDAC_PERIOD_NS:
-        print("Fail2")
-dev.input_trigger_mode = TRIGGER_MODE
-if dev.input_trigger_mode != TRIGGER_MODE:
-        print("Fail3")
-
 MAX_SIZE = 10000
 if NB_TIMES == 0:
         inc = 0
@@ -127,6 +117,11 @@ while i <= NB_TIMES:
                 new_data = _sin[j : j + tmp]
                 #print(new_data)
                 dev.tx(new_data)
+                k = 0
+                while k < tmp:
+
+                        k = k + 1
+
                 j = j + tmp
         if i % 1000 == 0:
                 print("Sent %d" % i)

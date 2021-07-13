@@ -3,7 +3,7 @@ PLATFORM = xilinx
 # PLATFORM = altera
 # PLATFORM = aducm3029
 TINYIIOD=y
-HARDWARE = ad3552r_qspi_zed_standard.hdf
+HARDWARE ?= ad3552r_qspi_zed_standard.hdf
 VERBOSE=0
 CFLAGS += -DDEBUG
 CFLAGS += -DLOG_LEVEL=LOG_DEBUG
