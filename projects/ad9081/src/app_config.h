@@ -38,6 +38,8 @@
 *******************************************************************************/
 #ifndef APP_CONFIG_H_
 #define APP_CONFIG_H_
+#include "dt.h"
+
 
 #ifdef QUAD_MXFE
 #define MULTIDEVICE_INSTANCE_COUNT	4
@@ -81,6 +83,24 @@
 
 #define AD9081_TX_DAC_CHAN_CROSSBAR	{0x1, 0x2, 0x4, 0x8}
 
+static struct dt_property link_tx_ps_init[] = {
+	{"logical-lane-mapping", 8, (uint8_t []){0, 2, 7, 6, 1, 5, 4, 3}},
+	{"link-mode", 9},
+	{"subclass", 1},
+	{"version", 1},
+	{"dual-link", 0},
+	{"converters-per-device", 8},
+	{"octets-per-frame", 4},
+	{"frames-per-multiframe", 32},
+	{"converter-resolution", 16},
+	{"bits-per-sample", 16},
+	{"control-bits-per-sample", 0},
+	{"lanes-per-device", 4},
+	{"samples-per-converter-per-frame", 1},
+	{"high-density", 1},
+	{"tpl-phase-adjust", 3},
+};
+
 /* RX path */
 
 #define AD9081_RX_JESD_MODE		10
@@ -108,5 +128,22 @@
 #define AD9081_RX_CHAN_ENABLE		{1, 1, 0, 0, 1, 1, 0, 0}
 #define AD9081_RX_MAIN_NCO_SHIFT	{400000000, -400000000, 100000000, 100000000}
 #define AD9081_RX_CHAN_NCO_SHIFT	{0, 0, 0, 0, 0, 0, 0, 0}
+
+static struct dt_property link_rx_ps_init[] = {
+	{"logical-lane-mapping", 8, (uint8_t []){2, 0, 7, 6, 5, 4, 3, 1}},
+	{"link-mode", 10},
+	{"subclass", 1},
+	{"version", 1},
+	{"dual-link", 0},
+	{"converters-per-device", 8},
+	{"octets-per-frame", 4},
+	{"frames-per-multiframe", 32},
+	{"converter-resolution", 16},
+	{"bits-per-sample", 16},
+	{"control-bits-per-sample", 0},
+	{"lanes-per-device", 4},
+	{"samples-per-converter-per-frame", 1},
+	{"high-density", 1},
+};
 
 #endif

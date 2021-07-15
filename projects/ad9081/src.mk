@@ -29,11 +29,13 @@ SRCS += $(PROJECT)/src/app.c						\
 	$(DRIVERS)/axi_core/jesd204/xilinx_transceiver.c		\
 	$(DRIVERS)/spi/spi.c						\
 	$(DRIVERS)/gpio/gpio.c						\
+	$(DRIVERS)/jesd204/jesd204.c					\
 	$(PLATFORM_DRIVERS)/axi_io.c					\
 	$(PLATFORM_DRIVERS)/delay.c					\
 	$(PLATFORM_DRIVERS)/xilinx_gpio.c				\
 	$(PLATFORM_DRIVERS)/xilinx_spi.c				\
 	$(NO-OS)/util/clk.c						\
+	$(NO-OS)/util/dt.c						\
 	$(NO-OS)/util/util.c
 ifeq (y,$(strip $(QUAD_MXFE)))
 SRCS += $(DRIVERS)/frequency/adf4371/adf4371.c
@@ -80,11 +82,16 @@ INCS +=	$(PROJECT)/src/app_clock.h					\
 	$(DRIVERS)/axi_core/jesd204/axi_jesd204_tx.h			\
 	$(DRIVERS)/axi_core/jesd204/jesd204_clk.h			\
 	$(DRIVERS)/axi_core/jesd204/xilinx_transceiver.h		\
+	$(DRIVERS)/jesd204/device-states.h				\
+	$(DRIVERS)/jesd204/jesd204-priv.h				\
+	$(DRIVERS)/jesd204/jesd204.h					\
 	$(PLATFORM_DRIVERS)/gpio_extra.h				\
 	$(PLATFORM_DRIVERS)/spi_extra.h					\
+	$(INCLUDE)/print_log.h						\
 	$(INCLUDE)/axi_io.h						\
 	$(INCLUDE)/clk.h						\
 	$(INCLUDE)/delay.h						\
+	$(INCLUDE)/dt.h							\
 	$(INCLUDE)/error.h						\
 	$(INCLUDE)/gpio.h						\
 	$(INCLUDE)/spi.h						\
