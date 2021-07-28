@@ -48,6 +48,7 @@
 #include "spi.h"
 #include "gpio.h"
 #include "adi_ad9081.h"
+#include "jesd204.h"
 
 /******************************************************************************/
 /********************** Macros and Types Declarations *************************/
@@ -58,6 +59,7 @@
 struct ad9081_jesd_link {
 	bool is_jrx;
 	adi_cms_jesd_param_t jesd_param;
+	struct jesd204_link jesd204_link;
 	uint32_t jrx_tpl_phase_adjust;
 	uint8_t logiclane_mapping[8];
 	uint8_t link_converter_select[16];
