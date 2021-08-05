@@ -653,6 +653,8 @@ static int32_t ad9081_setup(struct ad9081_phy *phy)
 	if (ret != 0 || !dcm)
 		return ret;
 
+	phy->adc_dcm = dcm;
+
 	if (phy->config_sync_01_swapped &&
 	    phy->jesd_tx_link.jesd_param.jesd_jesdv != 2) {
 		adi_ad9081_hal_bf_set(&phy->ad9081, REG_SYNCB_CTRL_ADDR,
