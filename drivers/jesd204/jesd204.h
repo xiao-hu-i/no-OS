@@ -263,5 +263,9 @@ int jesd204_run(struct jesd204_dev *jdev);
 
 int jesd204_link_get_lmfc_lemc_rate(struct jesd204_link *lnk,
 				    unsigned long *rate_hz);
+void jesd204_copy_link_params(struct jesd204_link *dst,
+			      const struct jesd204_link *src);
+int jesd204_link_get_rate_khz(struct jesd204_link *lnk,
+			      unsigned long *lane_rate_khz);
 
 #endif
