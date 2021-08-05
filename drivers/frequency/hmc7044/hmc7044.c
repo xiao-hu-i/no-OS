@@ -901,7 +901,7 @@ static int hmc7044_jesd204_link_supported(struct jesd204_dev *jdev,
 		ret = hmc7044_lmfc_lemc_validate(hmc, hmc->pll2_freq, (uint32_t)rate);
 	}
 
-	pr_debug(dev, "%s:%d link_num %u LMFC/LEMC %u/%lu gcd %u\n",
+	pr_debug("%s:%d link_num %u LMFC/LEMC %u/%lu gcd %u\n",
 		__FUNCTION__, __LINE__, lnk->link_id, hmc->jdev_lmfc_lemc_rate,
 		rate, hmc->jdev_lmfc_lemc_gcd);
 	if (ret)
