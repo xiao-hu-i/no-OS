@@ -118,6 +118,7 @@ struct ad9081_phy {
 };
 
 struct link_init_param {
+	uint32_t	link_id;
 	uint32_t	device_id;
 	uint32_t	octets_per_frame;
 	uint32_t	frames_per_multiframe;

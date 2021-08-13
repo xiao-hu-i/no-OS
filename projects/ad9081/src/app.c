@@ -48,6 +48,8 @@
 #include "spi.h"
 #include "spi_extra.h"
 #include "ad9081.h"
+#include "adi_ad9081.h"
+#include "adi_ad9081_hal.h"
 #include "app_clock.h"
 #include "app_jesd.h"
 #include "axi_jesd204_rx.h"
@@ -80,6 +82,166 @@ const char pretty[] = "%-20s: %-10s %-20s() %-10s\n";
 
 struct ad9081_jesd204_priv {
 };
+
+static int ad9081_nco_sync_master_slave(struct ad9081_phy *phy, bool master)
+{
+	int ret;
+
+	ret = adi_ad9081_device_nco_sync_pre(&phy->ad9081);
+	if (ret != 0)
+		return ret;
+
+	/* trigger_src  0: sysref, 1: lmfc rising edge, 2: lmfc falling edge */
+
+	return adi_ad9081_adc_nco_master_slave_sync(&phy->ad9081,
+					     master,
+					     1, /* trigger_src */
+					     0, /* gpio_index */
+					     phy->nco_sync_ms_extra_lmfc_num);
+}
+
+int32_t ad9081_jesd_tx_link_dig_reset(adi_ad9081_device_t *device,
+				      uint8_t reset)
+{
+	int32_t err;
+
+	AD9081_NULL_POINTER_RETURN(device);
+	AD9081_INVALID_PARAM_RETURN(reset > 1);
+
+	err = adi_ad9081_hal_bf_set(device, REG_FORCE_LINK_RESET_REG_ADDR,
+				    BF_FORCE_LINK_DIGITAL_RESET_INFO,
+				    reset); /* not paged */
+	AD9081_ERROR_RETURN(err);
+
+	return API_CMS_ERROR_OK;
+}
+
+static const char *const ad9081_jtx_qbf_states[] = {
+	"CGS", "ILA_M0R", "ILA_M0", "ILA_M1R", "ILA_M1C1", "ILA_M1C2",
+	"ILA_M1C3", "ILA_M1", "ILA_M2R", "ILA_M2", "ILA_M3R", "ILA_M3",
+	"ILA_BP", "DATA"
+};
+
+int ad9081_jesd_tx_link_status_print(struct ad9081_phy *phy,
+				     struct jesd204_link *lnk, int retry)
+{
+	int ret, l;
+	uint16_t stat;
+
+	switch (lnk->link_id) {
+	case FRAMER_LINK0_RX:
+		l = AD9081_LINK_0;
+		break;
+	case FRAMER_LINK1_RX:
+		l = AD9081_LINK_1;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	do {
+		ret = adi_ad9081_jesd_tx_link_status_get(
+			&phy->ad9081, l, &stat);
+		if (ret)
+			return -EFAULT;
+
+		if (lnk->jesd_version == JESD204_VERSION_C) {
+			if ((stat & 0x60) == 0x60)
+				ret = 0;
+			else
+				ret = -EIO;
+
+			if (ret == 0 || retry == 0)
+				pr_info("JESD RX (JTX) Link%d PLL %s, PHASE %s, MODE %s\n",
+					lnk->link_id,
+					stat & BIT(5) ? "locked" : "unlocked",
+					stat & BIT(6) ? "established" : "lost",
+					stat & BIT(7) ? "invalid" : "valid");
+			else
+				mdelay(20);
+		} else {
+			if ((stat & 0xFF) == 0x7D)
+				ret = 0;
+			else
+				ret = -EIO;
+
+			if (ret == 0 || retry == 0)
+				pr_info("JESD RX (JTX) Link%d in %s, SYNC %s, PLL %s, PHASE %s, MODE %s\n",
+					lnk->link_id, ad9081_jtx_qbf_states[stat & 0xF],
+					stat & BIT(4) ? "deasserted" : "asserted",
+					stat & BIT(5) ? "locked" : "unlocked",
+					stat & BIT(6) ? "established" : "lost",
+					stat & BIT(7) ? "invalid" : "valid");
+			else
+				mdelay(20);
+		}
+	} while (ret && retry--);
+
+	return ret;
+}
+
+static const char *const ad9081_jrx_204c_states[] = {
+	"Reset", "Undef", "Sync header alignment done",
+	"Extended multiblock sync complete",
+	"Extended multiblock alignment complete",
+	"Undef", "Link is good", "Undef",
+};
+
+static int ad9081_jesd_rx_link_status_print(struct ad9081_phy *phy,
+				     struct jesd204_link *lnk, int retry)
+{
+	int ret, l;
+	uint16_t stat, mask;
+
+	switch (lnk->link_id) {
+	case DEFRAMER_LINK0_TX:
+		l = AD9081_LINK_0;
+		break;
+	case DEFRAMER_LINK1_TX:
+		l = AD9081_LINK_1;
+		break;
+	default:
+		return -EINVAL;
+	}
+
+	do {
+		ret = adi_ad9081_jesd_rx_link_status_get(&phy->ad9081, l, &stat);
+		if (ret)
+			return -EFAULT;
+
+		if (lnk->jesd_version == JESD204_VERSION_C) {
+			stat >>= 8;
+			if (stat == 6)
+				ret = 0;
+			else
+				ret = -EIO;
+
+			if (ret == 0 || retry == 0)
+				pr_info("JESD TX (JRX) Link%d 204C status: %s (%d)\n",
+					lnk->link_id, ad9081_jrx_204c_states[stat & 0x7],
+					stat);
+			else
+				mdelay(20);
+		} else {
+			mask = (1 << lnk->num_lanes) - 1;
+
+			stat = mask & stat;
+
+			if (stat == mask)
+				ret = 0;
+			else
+				ret = -EIO;
+
+			if (ret == 0 || retry == 0)
+				pr_info("JESD TX (JRX) Link%d 0x%X lanes in DATA\n",
+					lnk->link_id, stat);
+			else
+				mdelay(20);
+		}
+	} while (ret && retry--);
+
+	return ret;
+}
 
 int ad9081_jesd204_uninit(struct jesd204_dev *jdev,
 			    enum jesd204_state_op_reason reason)
@@ -144,51 +306,193 @@ static int ad9081_jesd204_clks_enable(struct jesd204_dev *jdev,
 		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
 {
+	struct ad9081_phy *phy = jesd204_dev_priv(jdev);
+	int ret;
+
 	pr_debug("%s:%d reason %s\n", __FUNCTION__, __LINE__, jesd204_state_op_reason_str(reason));
 
-	return 0;
+	if (lnk->is_transmit && (reason == JESD204_STATE_OP_REASON_INIT) &&
+		(lnk->jesd_version == JESD204_VERSION_C)) {
+
+		if ((phy->jesd_tx_link.lane_rate_kbps > 16230000UL) &&
+			phy->jesd_tx_link.lane_cal_rate_kbps !=
+			phy->jesd_tx_link.lane_rate_kbps) {
+
+			ret = adi_ad9081_jesd_rx_link_enable_set(&phy->ad9081,
+				(phy->jesd_tx_link.jesd_param.jesd_duallink > 0) ?
+				AD9081_LINK_ALL : AD9081_LINK_0, 1);
+			if (ret != 0)
+				return ret;
+
+			pr_info("running jesd_rx_calibrate_204c, LR %lu kbps",
+				phy->jesd_tx_link.lane_rate_kbps);
+
+			ret = adi_ad9081_jesd_rx_calibrate_204c(&phy->ad9081, 1, 0, 0);
+			if (ret < 0)
+				return ret;
+
+			ret = adi_ad9081_jesd_rx_link_enable_set(&phy->ad9081,
+				(phy->jesd_tx_link.jesd_param.jesd_duallink > 0) ?
+				AD9081_LINK_ALL : AD9081_LINK_0, 0);
+			if (ret != 0)
+				return ret;
+		}
+
+		phy->jesd_tx_link.lane_cal_rate_kbps = phy->jesd_tx_link.lane_rate_kbps;
+	}
+
+	if (!lnk->is_transmit) {
+		/* txfe RX (JTX) link digital reset */
+		ret = ad9081_jesd_tx_link_dig_reset(&phy->ad9081,
+			reason != JESD204_STATE_OP_REASON_INIT);
+		if (ret != 0)
+			return ret;
+
+		mdelay(4);
+	}
+
+	return JESD204_STATE_CHANGE_DONE;
 }
 
 static int ad9081_jesd204_link_enable(struct jesd204_dev *jdev,
 		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
 {
-	pr_debug("%s:%d reason %s\n", __FUNCTION__, __LINE__, jesd204_state_op_reason_str(reason));
+	struct ad9081_phy *phy = jesd204_dev_priv(jdev);
+	int ret;
 
-	return 0;
+	pr_debug("%s:%d link_num %u reason %s\n", __FUNCTION__, __LINE__, lnk->link_id, jesd204_state_op_reason_str(reason));
+
+	if (lnk->is_transmit) {
+		/* txfe TX (JRX) link */
+		ret = adi_ad9081_jesd_rx_link_enable_set(&phy->ad9081,
+			(phy->jesd_tx_link.jesd_param.jesd_duallink > 0) ?
+			AD9081_LINK_ALL : AD9081_LINK_0,
+			reason == JESD204_STATE_OP_REASON_INIT);
+		if (ret != 0)
+			return ret;
+	}
+
+	return JESD204_STATE_CHANGE_DONE;
 }
 
 static int ad9081_jesd204_link_running(struct jesd204_dev *jdev,
 		enum jesd204_state_op_reason reason,
 		struct jesd204_link *lnk)
 {
+	struct ad9081_phy *phy = jesd204_dev_priv(jdev);
+	int ret;
+
 	pr_debug("%s:%d reason %s\n", __FUNCTION__, __LINE__, jesd204_state_op_reason_str(reason));
 
-	return 0;
+	if (reason != JESD204_STATE_OP_REASON_INIT) {
+//		TODO: evaluate what needs to be done
+//		if (lnk->is_transmit && phy->jrx_link_watchdog_en)
+//			cancel_delayed_work(&phy->dwork);
+
+		return JESD204_STATE_CHANGE_DONE;
+	}
+
+	if (lnk->is_transmit) {
+		ret = ad9081_jesd_rx_link_status_print(phy, lnk, 3);
+		if (ret < 0)
+			return JESD204_STATE_CHANGE_ERROR;
+	} else {
+		ret = ad9081_jesd_tx_link_status_print(phy, lnk, 3);
+		if (ret < 0)
+			return JESD204_STATE_CHANGE_ERROR;
+	}
+
+//	TODO: evaluate what needs to be done
+//	if (lnk->is_transmit && phy->jrx_link_watchdog_en)
+//		schedule_delayed_work(&phy->dwork, msecs_to_jiffies(1000));
+
+	return JESD204_STATE_CHANGE_DONE;
 }
 
 static int ad9081_jesd204_setup_stage1(struct jesd204_dev *jdev,
 					 enum jesd204_state_op_reason reason)
 {
+	struct ad9081_phy *phy = jesd204_dev_priv(jdev);
+	int ret;
+
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
 	pr_debug("%s:%d reason %s\n", __FUNCTION__, __LINE__, jesd204_state_op_reason_str(reason));
 
-	return 0;
+	ret = ad9081_jesd_tx_link_dig_reset(&phy->ad9081, 0);
+	if (ret != 0)
+		return ret;
+
+	mdelay(4);
+
+	/* JESD OneShot Sync */
+	ret = adi_ad9081_hal_bf_set(&phy->ad9081, REG_SYNC_DEBUG0_ADDR,
+		BF_AVRG_FLOW_EN_INFO, 1);
+	if (ret != 0)
+		return ret;
+
+	ret = adi_ad9081_hal_bf_set(&phy->ad9081, REG_SYSREF_AVERAGE_ADDR,
+		BF_SYSREF_AVERAGE_INFO,
+		BF_SYSREF_AVERAGE(7));
+	if (ret != 0)
+		return ret;
+
+	ret = adi_ad9081_jesd_oneshot_sync(&phy->ad9081);
+	if (ret != 0)
+		return ret;
+
+	ret = adi_ad9081_hal_bf_set(&phy->ad9081, REG_SYNC_DEBUG0_ADDR,
+		BF_AVRG_FLOW_EN_INFO, 0);
+	if (ret != 0)
+		return ret;
+
+	ret = adi_ad9081_hal_bf_set(&phy->ad9081, REG_SYSREF_AVERAGE_ADDR,
+		BF_SYSREF_AVERAGE_INFO,
+		BF_SYSREF_AVERAGE(0));
+	if (ret != 0)
+		return ret;
+
+	return JESD204_STATE_CHANGE_DONE;
 }
 
 static int ad9081_jesd204_setup_stage2(struct jesd204_dev *jdev,
 					 enum jesd204_state_op_reason reason)
 {
+	struct ad9081_phy *phy = jesd204_dev_priv(jdev);
+	int ret;
+
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
 	pr_debug("%s:%d reason %s\n", __FUNCTION__, __LINE__, jesd204_state_op_reason_str(reason));
 
-	return 0;
+	/* Master Slave NCO Sync */
+
+	ret = ad9081_nco_sync_master_slave(phy, jesd204_dev_is_top(jdev));
+	if (ret != 0)
+		return ret;
+
+	return JESD204_STATE_CHANGE_DONE;
 }
 
 static int ad9081_jesd204_setup_stage3(struct jesd204_dev *jdev,
 					 enum jesd204_state_op_reason reason)
 {
+	struct ad9081_phy *phy = jesd204_dev_priv(jdev);
+	int ret;
+
+	if (reason != JESD204_STATE_OP_REASON_INIT)
+		return JESD204_STATE_CHANGE_DONE;
+
 	pr_debug("%s:%d reason %s\n", __FUNCTION__, __LINE__, jesd204_state_op_reason_str(reason));
 
-	return 0;
+	ret = adi_ad9081_device_nco_sync_post(&phy->ad9081);
+	if (ret != 0)
+		return ret;
+
+	return JESD204_STATE_CHANGE_DONE;
 }
 
 static const struct jesd204_dev_data jesd204_ad9081_init = {
@@ -344,7 +648,7 @@ int main(void)
 		.extra = &xil_spi_param
 	};
 	struct link_init_param jesd_tx_link = {
-		.device_id = 0,
+		.link_id = DEFRAMER_LINK0_TX,
 		.octets_per_frame = AD9081_TX_JESD_F,
 		.frames_per_multiframe = AD9081_TX_JESD_K,
 		.samples_per_converter_per_frame = AD9081_TX_JESD_S,
@@ -362,7 +666,7 @@ int main(void)
 		.tpl_phase_adjust = 12
 	};
 	struct link_init_param jesd_rx_link = {
-		.device_id = 0,
+		.link_id = FRAMER_LINK0_RX,
 		.octets_per_frame = AD9081_RX_JESD_F,
 		.frames_per_multiframe = AD9081_RX_JESD_K,
 		.samples_per_converter_per_frame = AD9081_RX_JESD_S,
@@ -562,16 +866,16 @@ int main(void)
 	status = jesd204_dev_register(&topjdev, "top", &jesd204_ad9081_init);
 	if (status < 0)
 		return status;
-#define LINK_TX		0
-#define LINK_RX		1
+
+	jesd204_set_dev_priv(topjdev, &phy[0]);
 
 	struct jesd204_dev *link_tx_devices[] = {hmc7044_dev->jdev, /* TODO: add more */};
 	struct jesd204_link_dev link_tx = {
-			.link_id = LINK_TX,
+			.link_id = DEFRAMER_LINK0_TX,
 			.top_device = topjdev,
 			.devices = link_tx_devices,
 			.num_devices = ARRAY_SIZE(link_tx_devices),
-			.link = &link0,
+			.link = &phy[0]->jesd_tx_link.jesd204_link,
 	};
 
 	struct jesd204_dev *link1_rx_devices[] = {hmc7044_dev->jdev, /* TODO: add more */};
@@ -602,11 +906,11 @@ int main(void)
 			.samples_per_conv_frame = 1,
 	};
 	struct jesd204_link_dev link_rx = {
-			.link_id = LINK_RX,
+			.link_id = FRAMER_LINK0_RX,
 			.top_device = topjdev,
 			.devices = link1_rx_devices,
 			.num_devices = ARRAY_SIZE(link1_rx_devices),
-			.link = &link1, // TODO: remove, link_init of top device should populate this info
+			.link = &phy[0]->jesd_rx_link[0].jesd204_link,
 	};
 
 	jesd204_link_register(topjdev, &link_tx);

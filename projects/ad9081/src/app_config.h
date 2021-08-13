@@ -45,8 +45,10 @@
 #define MULTIDEVICE_INSTANCE_COUNT	4
 #else
 #define MULTIDEVICE_INSTANCE_COUNT	1
+/*
 static struct dt_property trx0_ad9081_ps_init[] = {
 };
+*/
 #endif
 
 #define AD9081_DAC_FREQUENCY	12000000000
@@ -84,7 +86,7 @@ static struct dt_property trx0_ad9081_ps_init[] = {
 #define AD9081_TX_CHAN_GAIN		{2048, 2048, 2048, 2048, 0, 0, 0, 0}
 
 #define AD9081_TX_DAC_CHAN_CROSSBAR	{0x1, 0x2, 0x4, 0x8}
-
+/*
 static struct dt_property link_tx_ps_init[] = {
 	{"logical-lane-mapping", 8, (uint8_t []){0, 2, 7, 6, 1, 5, 4, 3}},
 	{"link-mode", 9},
@@ -102,7 +104,7 @@ static struct dt_property link_tx_ps_init[] = {
 	{"high-density", 1},
 	{"tpl-phase-adjust", 3},
 };
-
+*/
 /* RX path */
 
 #define AD9081_RX_JESD_MODE		10
@@ -130,7 +132,7 @@ static struct dt_property link_tx_ps_init[] = {
 #define AD9081_RX_CHAN_ENABLE		{1, 1, 0, 0, 1, 1, 0, 0}
 #define AD9081_RX_MAIN_NCO_SHIFT	{400000000, -400000000, 100000000, 100000000}
 #define AD9081_RX_CHAN_NCO_SHIFT	{0, 0, 0, 0, 0, 0, 0, 0}
-
+/*
 static struct dt_property link_rx_ps_init[] = {
 	{"logical-lane-mapping", 8, (uint8_t []){2, 0, 7, 6, 5, 4, 3, 1}},
 	{"link-mode", 10},
@@ -147,5 +149,5 @@ static struct dt_property link_rx_ps_init[] = {
 	{"samples-per-converter-per-frame", 1},
 	{"high-density", 1},
 };
-
+*/
 #endif

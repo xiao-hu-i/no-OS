@@ -256,6 +256,7 @@ struct jesd204_link_dev {
 void *jesd204_dev_priv(struct jesd204_dev *jdev);
 void jesd204_set_dev_priv(struct jesd204_dev *jdev, void *priv);
 char *jesd204_dev_name(struct jesd204_dev *jdev);
+bool jesd204_dev_is_top(struct jesd204_dev *jdev);
 
 int jesd204_dev_register(struct jesd204_dev **jdev, char *name, const struct jesd204_dev_data *data);
 int jesd204_link_register(struct jesd204_dev *jdev, struct jesd204_link_dev *link_dev);

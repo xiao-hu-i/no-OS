@@ -20,6 +20,16 @@ char *jesd204_dev_name(struct jesd204_dev *jdev)
 {
 	if (jdev)
 		return jdev->name;
+
+	return NULL;
+}
+
+bool jesd204_dev_is_top(struct jesd204_dev *jdev)
+{
+	if (jdev)
+		return jdev->is_top;
+
+	return false;
 }
 
 int jesd204_dev_register(struct jesd204_dev **jdev, char *name, const struct jesd204_dev_data *data)
